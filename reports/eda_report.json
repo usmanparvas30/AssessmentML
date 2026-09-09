@@ -1,0 +1,55 @@
+{
+  "train_rows": 48000,
+  "validation_rows": 12000,
+  "train_date_range": [
+    "2025-01-01",
+    "2025-10-31"
+  ],
+  "validation_date_range": [
+    "2025-11-01",
+    "2025-12-31"
+  ],
+  "negative_weight_rows": 292,
+  "missing_weight_rows": 300,
+  "missing_market_index_rows": 374,
+  "quote_signal_corr_with_rpm": 0.04934221408928215,
+  "market_index_row_corr_with_rpm": 0.08347811751487431,
+  "market_index_daily_corr_with_rpm": 0.5771144974463829,
+  "cities_in_validation_absent_from_train": [
+    "Allentown",
+    "Charlotte",
+    "Chicago",
+    "Jackson",
+    "Knoxville",
+    "Laredo",
+    "Norfolk",
+    "San Diego"
+  ],
+  "contamination_p005_log_residual": -1.0664013817915439,
+  "contamination_p995_log_residual": 1.064644281140723,
+  "rate_per_mile_quantiles": {
+    "0.01": 1.6735214945063572,
+    "0.25": 1.9869742539000856,
+    "0.5": 2.1453480823707856,
+    "0.75": 2.342696485436716,
+    "0.99": 3.1769396299902666
+  },
+  "rate_per_mile_by_equipment": {
+    "Dry Van": 2.0462,
+    "Flatbed": 2.2197,
+    "Reefer": 2.3115
+  },
+  "monthly_mean_rate_per_mile": {
+    "2025-01": 2.1002208158922437,
+    "2025-02": 2.1228854480398427,
+    "2025-03": 2.2061317077737113,
+    "2025-04": 2.2103086817571396,
+    "2025-05": 2.2601064958987447,
+    "2025-06": 2.3324837814884014,
+    "2025-07": 2.2559522403440386,
+    "2025-08": 2.188584370966633,
+    "2025-09": 2.2297249726276376,
+    "2025-10": 2.2397625947405086
+  },
+  "distance_corr_with_rate": 0.9085191518300784
+}
