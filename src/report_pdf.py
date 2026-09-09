@@ -197,7 +197,6 @@ def build() -> None:
                     "Rate per mile by length of haul and equipment type.", style))
 
     # ------------------------------------------------------------------------
-    S.append(PageBreak())
     H("Data quality, and two problems I deliberately left alone")
     P("Three defects are real and were repaired. Two more look like defects and were not, which took longer "
       "to establish than the repairs did.")
@@ -238,7 +237,6 @@ def build() -> None:
                     "percentiles - note how nearly they mirror each other.", style))
 
     # ------------------------------------------------------------------------
-    S.append(PageBreak())
     H("How the data was split, and why it matters more than usual")
     P("A random hold-out would have been the wrong instrument here, and not by a small margin. Splitting "
       "rows at random lets the model train on the same weeks it is scored on, so it never has to survive the "
@@ -247,12 +245,12 @@ def build() -> None:
       "at exactly the horizon the submission faces. Within each fold, base learners are fitted on the "
       "earliest stretch, the dollar calibration factor is fitted on the most recent two months before the "
       "hidden block, and only then is the hidden block scored.")
-    S.append(table(
+    S.append(KeepTogether(table(
         ["Fold", "Fitted on", "Calibration window", "Scored on", "Rows scored"],
         [[str(i + 1), f"{f['fit_rows']:,} rows", f"{f['blend_rows']:,} rows",
           f"{f['eval_window'][0]} to {f['eval_window'][1]}", f"{f['eval_rows']:,}"]
          for i, f in enumerate(folds)],
-        [0.45, 1.15, 1.25, 2.15, 1.0], align_right=(4,)))
+        [0.45, 1.15, 1.25, 2.15, 1.0], align_right=(4,))))
     S.append(Spacer(1, 10))
     B("Nothing inside a scored block reaches the model. Base learners, lane encodings and the calibration "
       "factor are all fitted strictly on earlier dates.")
@@ -301,7 +299,6 @@ def build() -> None:
       f"block still determines.")
 
     # ------------------------------------------------------------------------
-    S.append(PageBreak())
     H("Three ensembles that did not work")
     P("This is the part of the project that consumed the most time and produced the least code, and it is "
       "worth writing down properly, because each attempt failed for a different and instructive reason.")
@@ -345,18 +342,18 @@ def build() -> None:
       "because the comparison is evidence; only two of them carry any weight at prediction time.")
 
     # ------------------------------------------------------------------------
-    S.append(PageBreak())
     H("Results")
     P(f"Averaged across the three rolling-origin folds. The shipped model reaches {money(stack['mae'])} mean "
       f"absolute error at {stack['mape']:.2f}% MAPE, against {money(best_baseline['mae'])} for the strongest "
       f"naive rate-per-mile rule - an error reduction of "
       f"{100 * (1 - stack['mae'] / best_baseline['mae']):.0f}%.")
-    S.append(table(
+    # Kept whole: a results table split across a page boundary is unreadable.
+    S.append(KeepTogether(table(
         ["Model", "MAE", "RMSE", "MAPE", "Med APE", "R<super>2</super>"],
         [[ROLES.get(name, name), money(s["mae"]), money(s["rmse"]), f"{s['mape']:.2f}%",
           f"{s['medape']:.2f}%", f"{s['r2']:.3f}"]
          for name, s in sorted(summary.items(), key=lambda kv: kv[1]["mae"])],
-        [2.35, 0.72, 0.78, 0.62, 0.68, 0.55], align_right=(1, 2, 3, 4, 5)))
+        [2.35, 0.72, 0.78, 0.62, 0.68, 0.55], align_right=(1, 2, 3, 4, 5))))
     S.append(Spacer(1, 10))
     P(f"The row worth dwelling on is <b>hgb_mse</b>. It shares every feature and every hyperparameter with "
       f"<b>hgb_mae</b> and differs in exactly one respect - it minimises squared error instead of absolute "

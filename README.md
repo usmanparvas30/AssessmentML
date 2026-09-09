@@ -16,6 +16,7 @@ python -m pip install -r requirements.txt
 ## Run
 
 ```bash
+python src/selfcheck.py  # leak, fallback and December-path assertions
 python src/eda.py        # data-quality report + figures  -> reports/
 python src/validate.py   # rolling-origin validation      -> reports/validation_metrics.json
 python src/train.py      # fits the shipped model         -> artifacts/stack.joblib
@@ -26,6 +27,13 @@ Then the provided scorer:
 
 ```bash
 python score.py --predictions validation_predictions.csv --december-predictions december_chart_inputs.csv
+```
+
+Then the two reports (the second needs the scorer's chart to exist):
+
+```bash
+python src/report.py      # -> reports/freight_rate_model_report.docx
+python src/report_pdf.py  # -> reports/freight_rate_writeup.pdf
 ```
 
 `src/predict.py` writes the completed December file to the repository root and
@@ -116,4 +124,7 @@ src/validate.py   rolling-origin validation and baselines
 src/train.py      fits and saves the shipped model
 src/predict.py    writes the two submission files
 src/eda.py        the numbers and figures quoted in the report
+src/selfcheck.py  runnable assertions for the failures that would be silent
+src/report.py     the short DOCX report
+src/report_pdf.py the long-form PDF write-up
 ```
