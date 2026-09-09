@@ -20,7 +20,7 @@ FIGURES = D.REPORTS / "figures"
 CHART = D.ROOT / "scorer_results" / "candidate_december.png"
 
 MODEL_ROLES = {
-    "stack": "Greedy blend (shipped model)",
+    "stack": "Shipped model (equal-weight robust boosters)",
     "hgb_mae": "Gradient boosting, absolute-error loss",
     "hgb_deep": "Gradient boosting, deeper, absolute-error loss",
     "hgb_mse": "Gradient boosting, squared-error loss",
@@ -216,16 +216,41 @@ def build() -> None:
     # ------------------------------------------------------------------ model
     heading(document, "4. Model", 1)
     document.add_paragraph(
-        "Five learners over one shared design matrix, combined by greedy ensemble selection scored on dollar "
-        "mean absolute error. Selecting on the metric that is actually graded matters: an earlier version "
-        "fitted non-negative least squares in log space and produced a blend that scored worse than its own "
-        "best member. Predictions are converted back to dollars with a single multiplicative calibration "
-        f"factor ({training['calibration']:.4f}) chosen on held-out data, because a log-space fit is biased "
-        "in dollar space and the textbook smearing correction targets the mean rather than the metric here."
+        "Five learners are fitted over one shared design matrix so they can be compared honestly, but the "
+        "shipped model is a fixed, equal-weight average of the two absolute-error boosters. Nothing about "
+        "that weighting is fitted, and that is the result of measurement rather than taste."
     )
-    weights = training["blend_weights"]
+    heading(document, "Why the ensemble weights are not fitted", 2)
+    document.add_paragraph(
+        "Three weighting schemes were tried and rejected under the same rolling-origin validation:"
+    )
+    bullets(document, [
+        "Non-negative least squares in log space produced a blend that scored worse than its own best "
+        "member - $188 against $166 - because least squares in log space is not the metric being graded.",
+        "Greedy ensemble selection against dollar MAE fixed that, then overfitted the blend window: on the "
+        "earliest fold it handed 74% of the weight to the ridge model, which went on to score $498 MAE on "
+        "the very block it was meant to predict.",
+        "Bagging that selection moved the weights by under a percentage point, which is what ruled out "
+        "sampling noise as the explanation.",
+    ])
+    document.add_paragraph(
+        "The cause is a mismatch no weighting scheme can repair. Weights are learned from base models fitted "
+        "on the pre-blend window, then applied to models refitted on that window plus the blend window. On "
+        "the earliest fold that refit doubles the training data: the boosters improve sharply, ridge barely "
+        "moves, and the learned weights are stale before they are ever used. Across all three folds fitted "
+        "blending never beat the best single member - it either tied or lost badly - so the fitting was "
+        "removed. Averaging two near-equivalent robust boosters is a free variance reduction with nothing "
+        "fitted, and it avoids choosing between two learners separated by ten cents of cross-validated MAE."
+    )
+    document.add_paragraph(
+        "Predictions are converted back to dollars with a single multiplicative calibration factor "
+        f"({training['calibration']:.4f}) fitted on held-out data, because a log-space fit is biased in "
+        "dollar space and the textbook smearing correction targets the mean rather than the metric here. "
+        "That scalar is the only quantity the held-out block still determines."
+    )
+    weights = training["ensemble_weights"]
     table(document,
-          ["Learner", "Role", "Blend weight"],
+          ["Learner", "Role", "Weight"],
           [[name, MODEL_ROLES.get(name, ""), f"{weights.get(name, 0):.2f}"]
            for name in sorted(weights, key=lambda n: -weights[n])],
           widths=[1.1, 3.9, 1.0])

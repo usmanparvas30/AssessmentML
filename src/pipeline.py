@@ -47,15 +47,17 @@ class Stack:
     calibration: float = 1.0
     holdout_report: dict = field(default_factory=dict)
 
-    def base_predictions(self, frame: pd.DataFrame) -> pd.DataFrame:
+    def base_predictions(self, frame: pd.DataFrame, names=None) -> pd.DataFrame:
         matrix = F.design_matrix(frame, self.encoder.transform(frame))
+        names = list(self.fitted) if names is None else list(names)
         return pd.DataFrame(
-            {name: model.predict(matrix) for name, model in self.fitted.items()},
-            index=frame.index,
+            {name: self.fitted[name].predict(matrix) for name in names}, index=frame.index
         )
 
     def predict_log_rpm(self, frame: pd.DataFrame) -> np.ndarray:
-        base = self.base_predictions(frame)
+        # Only the shipped members are run at inference; the rest exist to be
+        # reported against.
+        base = self.base_predictions(frame, self.weights.index)
         return base[self.weights.index].values @ self.weights.values
 
     def predict(self, frame: pd.DataFrame) -> np.ndarray:
@@ -64,7 +66,7 @@ class Stack:
 
 def fit_stack(fit_frame: pd.DataFrame, blend_frame: pd.DataFrame, seed: int = 0,
               refit_on_all: bool = True) -> Stack:
-    """Fit base models, learn blend weights and calibration on `blend_frame`, then
+    """Fit base models, calibrate on `blend_frame`, then
     optionally refit the base models on the union so the shipped model has seen the
     most recent weeks - the ones closest to the November/December target period.
     """
@@ -74,13 +76,12 @@ def fit_stack(fit_frame: pd.DataFrame, blend_frame: pd.DataFrame, seed: int = 0,
     matrix = F.design_matrix(fit_frame, encodings)
 
     fitted = {name: model.fit(matrix, y_fit) for name, model in M.model_zoo(seed).items()}
-    stage = Stack(encoder=encoder, fitted=fitted,
-                  weights=pd.Series(1.0, index=list(fitted)) / len(fitted))
+    # Every learner is fitted so the comparison table in the report is real, but
+    # only the shipped members carry weight in the prediction.
+    stage = Stack(encoder=encoder, fitted=fitted, weights=M.ensemble_weights(fitted))
 
     blend_base = stage.base_predictions(blend_frame)
-    weights = M.blend_weights(
-        blend_base, blend_frame["distance"].values, blend_frame[D.TARGET].values
-    )
+    weights = M.ensemble_weights(blend_base.columns)
     blended = blend_base[weights.index].values @ weights.values
     calibration = M.calibration_factor(
         blended, blend_frame["distance"].values, blend_frame[D.TARGET].values

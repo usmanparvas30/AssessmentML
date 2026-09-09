@@ -60,24 +60,20 @@ def check_dollar_conversion() -> None:
     assert (M.to_dollars(np.array([-50.0]), np.array([1.0])) > 0).all(), "rates must stay positive"
 
 
-def check_blend_beats_its_members() -> None:
-    """Greedy selection is only worth its complexity if it cannot be worse than
-    the best member on the data it is fitted on."""
-    rng = np.random.default_rng(0)
-    distance = rng.uniform(100, 2000, 500)
-    truth = np.log(rng.uniform(1.5, 3.0, 500))
-    actual = M.to_dollars(truth, distance)
-    predictions = pd.DataFrame({
-        "good": truth + rng.normal(0, 0.02, 500),
-        "bad": truth + rng.normal(0, 0.50, 500),
-    })
-    weights = M.blend_weights(predictions, distance, actual)
-    blended = predictions.values @ weights.values
-    best_member = min(
-        np.mean(np.abs(M.to_dollars(predictions[c], distance) - actual)) for c in predictions
-    )
-    assert np.mean(np.abs(M.to_dollars(blended, distance) - actual)) <= best_member * 1.001
-    assert weights["good"] > weights["bad"], weights.to_dict()
+def check_ensemble_is_unfitted() -> None:
+    """The shipped ensemble must not depend on held-out data in any way.
+
+    Guards the regression that motivated it: fitted weights let a learner that
+    merely looked good on the blend window dominate, and cost $250 of MAE on the
+    earliest fold.
+    """
+    members = list(M.SHIPPED_MEMBERS)
+    weights = M.ensemble_weights(members + ["ridge", "forest"])
+    assert list(weights.index) == members, weights.to_dict()
+    assert np.allclose(weights.values, 1.0 / len(members)), "shipped weights are not equal"
+    assert np.isclose(weights.sum(), 1.0)
+    # Same answer whatever data is around: nothing here is fitted.
+    assert weights.equals(M.ensemble_weights(members))
 
 
 def check_cleaning(frames: dict) -> None:
@@ -95,7 +91,7 @@ def main() -> None:
         ("encoder is leak-free", lambda: check_encoder_is_leak_free(frames)),
         ("unseen cities fall back", lambda: check_unseen_cities_fall_back(frames)),
         ("dollar conversion", check_dollar_conversion),
-        ("blend never worse than members", check_blend_beats_its_members),
+        ("ensemble is unfitted", check_ensemble_is_unfitted),
     ]
     for name, check in checks:
         check()

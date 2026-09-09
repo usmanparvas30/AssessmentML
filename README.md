@@ -52,8 +52,9 @@ flatters the model. Blend weights and the calibration factor are fitted only on
 the most recent two months available inside each fold, never on the evaluated
 block.
 
-**Model.** Five learners over the same design matrix, combined by greedy ensemble
-selection scored on dollar MAE:
+**Model.** Five learners are fitted over the same design matrix so they can be
+compared honestly, but the shipped model is a fixed, equal-weight average of the
+two absolute-error boosters - nothing about the weighting is fitted:
 
 | learner | role |
 |---|---|
@@ -62,6 +63,15 @@ selection scored on dollar MAE:
 | `hgb_mse` | squared-error twin, kept as evidence for the robust loss |
 | `forest` | random forest, decorrelated errors |
 | `ridge` | linear reference |
+
+Three fitted weighting schemes were measured and rejected first: least squares in
+log space (blend scored worse than its own best member), greedy selection on
+dollar MAE (gave ridge 74% of the weight on the earliest fold, where ridge scored
+$498 MAE), and bagged greedy selection (moved the weights under a percentage
+point, ruling out sampling noise). The cause is that weights are learned from
+models fitted on the pre-blend window and then applied to models refitted on more
+data, which reorders them. Across all three folds fitted blending never beat the
+best single member, so the fitting is gone. See `models.ensemble_weights`.
 
 ## What the data says
 

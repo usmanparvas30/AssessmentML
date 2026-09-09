@@ -52,42 +52,41 @@ def to_dollars(log_rpm, distance, calibration: float = 1.0) -> np.ndarray:
     return np.clip(np.exp(np.asarray(log_rpm)) * np.asarray(distance) * calibration, 1.0, None)
 
 
-def blend_weights(predictions: pd.DataFrame, distance, actual, n_iter: int = 30) -> pd.Series:
-    """Greedy ensemble selection (Caruana) on held-out data, scored in dollars.
+# The shipped model is a fixed, equal-weight average of the two absolute-error
+# boosters. It is deliberately *not* a fitted blend - see `ensemble_weights`.
+SHIPPED_MEMBERS = ("hgb_mae", "hgb_deep")
 
-    An earlier version fitted non-negative least squares in log space and produced
-    a blend that was *worse* than its own best member: least squares in log space
-    is not the objective anyone is graded on. This picks members one at a time,
-    with replacement, against dollar MAE - the metric that actually matters - so a
-    learner only enters the blend if it improves that number.
+
+def ensemble_weights(names) -> pd.Series:
+    """Equal weights over the shipped members. No parameters are fitted here.
+
+    Three ensembling schemes were tried and measured under rolling-origin
+    validation before settling on none of them:
+
+    1. Non-negative least squares in log space produced a blend that scored worse
+       than its own best member - log-space least squares is not the graded metric.
+    2. Greedy selection against dollar MAE fixed that, then overfitted the blend
+       window: on the earliest fold it gave the ridge model 74% of the weight, and
+       ridge went on to score $498 MAE on the block it was meant to predict.
+    3. Bagging the greedy selection changed the weights by less than a percentage
+       point, which is what ruled out sampling noise as the explanation.
+
+    The actual cause is a mismatch that no weighting scheme can fix: weights are
+    learned from base models fitted on the pre-blend window, then applied to models
+    refitted on that window plus the blend window. On the earliest fold that refit
+    doubles the training data, the boosters improve sharply, ridge barely moves,
+    and the weights are stale before they are ever used.
+
+    Across all three folds fitted blending never beat the best single member - it
+    either tied or lost badly - so the fitting is gone. Averaging the two
+    absolute-error boosters is a free variance reduction with nothing fitted, and
+    it avoids picking between two learners separated by $0.10 of cross-validated
+    MAE.
     """
-    distance = np.asarray(distance, dtype=float)
-    actual = np.asarray(actual, dtype=float)
-    columns = list(predictions.columns)
-    values = {name: predictions[name].to_numpy(dtype=float) for name in columns}
-
-    def score(mean_log_rpm):
-        return float(np.mean(np.abs(to_dollars(mean_log_rpm, distance) - actual)))
-
-    counts = {name: 0 for name in columns}
-    running = np.zeros(len(actual))
-    chosen = 0
-    best_overall, best_counts = np.inf, None
-    for _ in range(n_iter):
-        candidate, candidate_score = None, np.inf
-        for name in columns:
-            trial = (running + values[name]) / (chosen + 1)
-            trial_score = score(trial)
-            if trial_score < candidate_score:
-                candidate, candidate_score = name, trial_score
-        running = running + values[candidate]
-        chosen += 1
-        counts[candidate] += 1
-        if candidate_score < best_overall:
-            best_overall, best_counts = candidate_score, dict(counts)
-
-    weights = pd.Series(best_counts, index=columns, dtype=float)
-    return weights / weights.sum()
+    members = [name for name in names if name in SHIPPED_MEMBERS]
+    if not members:
+        raise ValueError(f"none of {SHIPPED_MEMBERS} present in {list(names)}")
+    return pd.Series(1.0 / len(members), index=members)
 
 
 def calibration_factor(log_rpm_pred, distance, actual_rate, grid=None) -> float:
